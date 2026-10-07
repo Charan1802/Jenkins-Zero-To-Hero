@@ -11,7 +11,7 @@ pipeline {
         APP_DIR = 'java-maven-sonar-argocd-helm-k8s/spring-boot-app'
         MANIFEST_DIR = 'java-maven-sonar-argocd-helm-k8s/spring-boot-app-manifests'
         SONAR_URL = 'http://13.218.47.87:9000'
-        DOCKER_IMAGE = "Charan1802/ultimate-cicd:${BUILD_NUMBER}"
+        DOCKER_IMAGE = "charan1802/ultimate-cicd:${BUILD_NUMBER}"
         GIT_REPO_NAME = "Jenkins-Zero-To-Hero"
         GIT_USER_NAME = "Charan1802"
     }
