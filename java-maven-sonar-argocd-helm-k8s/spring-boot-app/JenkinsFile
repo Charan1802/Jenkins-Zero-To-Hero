@@ -1,8 +1,8 @@
+```groovy
 pipeline {
     agent {
         docker {
             image 'abhishekf5/maven-abhishek-docker-agent:v1'
-            // Added volume mount for local .m2 cache to drastically reduce build times
             args '--user root -v /var/run/docker.sock:/var/run/docker.sock -v /root/.m2:/root/.m2'
         }
     }
@@ -10,16 +10,22 @@ pipeline {
     environment {
         APP_DIR = 'java-maven-sonar-argocd-helm-k8s/spring-boot-app'
         MANIFEST_DIR = 'java-maven-sonar-argocd-helm-k8s/spring-boot-app-manifests'
+
+        // SonarQube
         SONAR_URL = 'http://13.218.47.87:9000'
+
+        // Docker Hub
         DOCKER_IMAGE = "charan1802/ultimate-cicd:${BUILD_NUMBER}"
+
+        // GitHub
         GIT_REPO_NAME = "Jenkins-Zero-To-Hero"
         GIT_USER_NAME = "Charan1802"
     }
 
     stages {
+
         stage('Checkout') {
             steps {
-                // Jenkins automatically handles SCM checkout when integrated with Git webhook / SCM plugin
                 sh 'ls -ltr'
             }
         }
@@ -27,7 +33,10 @@ pipeline {
         stage('Build and Test') {
             steps {
                 dir("${APP_DIR}") {
-                    sh 'mvn clean package -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn'
+                    sh '''
+                        mvn clean package \
+                        -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
+                    '''
                 }
             }
         }
@@ -35,8 +44,17 @@ pipeline {
         stage('Static Code Analysis') {
             steps {
                 dir("${APP_DIR}") {
-                    withCredentials([string(credentialsId: 'SonarQube', variable: 'SONAR_AUTH_TOKEN')]) {
-                        sh 'mvn sonar:sonar -Dsonar.login=$SONAR_AUTH_TOKEN -Dsonar.host.url=${SONAR_URL}'
+                    withCredentials([
+                        string(
+                            credentialsId: 'SonarQube',
+                            variable: 'SONAR_AUTH_TOKEN'
+                        )
+                    ]) {
+                        sh '''
+                            mvn sonar:sonar \
+                            -Dsonar.login="$SONAR_AUTH_TOKEN" \
+                            -Dsonar.host.url="$SONAR_URL"
+                        '''
                     }
                 }
             }
@@ -46,12 +64,30 @@ pipeline {
             steps {
                 dir("${APP_DIR}") {
                     script {
-                        // Build docker image
-                        sh "docker build -t ${DOCKER_IMAGE} ."
 
-                        withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                            sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
-                            sh "docker push ${DOCKER_IMAGE}"
+                        // Build Docker image
+                        sh '''
+                            docker build -t ${DOCKER_IMAGE} .
+                        '''
+
+                        // Login to Docker Hub
+                        withCredentials([
+                            usernamePassword(
+                                credentialsId: 'docker-hub-credentials',
+                                usernameVariable: 'DOCKER_USER',
+                                passwordVariable: 'DOCKER_PASS'
+                            )
+                        ]) {
+                            sh '''
+                                echo "$DOCKER_PASS" | docker login \
+                                --username "$DOCKER_USER" \
+                                --password-stdin
+                            '''
+
+                            // Push Docker image
+                            sh '''
+                                docker push ${DOCKER_IMAGE}
+                            '''
                         }
                     }
                 }
@@ -60,16 +96,28 @@ pipeline {
 
         stage('Update Deployment File') {
             steps {
-                withCredentials([string(credentialsId: 'Git', variable: 'GITHUB_TOKEN')]) {
+                withCredentials([
+                    string(
+                        credentialsId: 'Git',
+                        variable: 'GITHUB_TOKEN'
+                    )
+                ]) {
                     sh '''
                         git config user.email "saicharansiddabathula6@gmail.com"
                         git config user.name "Charan"
 
-                        sed -i "s/replaceImageTag/${BUILD_NUMBER}/g" ${MANIFEST_DIR}/deployment.yml
+                        sed -i "s/replaceImageTag/${BUILD_NUMBER}/g" \
+                        ${MANIFEST_DIR}/deployment.yml
 
                         git add ${MANIFEST_DIR}/deployment.yml
-                        git commit -m "Update deployment image to version ${BUILD_NUMBER} [skip ci]" || echo "No changes to commit"
-                        git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git HEAD:main
+
+                        git commit \
+                        -m "Update deployment image to version ${BUILD_NUMBER} [skip ci]" \
+                        || echo "No changes to commit"
+
+                        git push \
+                        https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git \
+                        HEAD:main
                     '''
                 }
             }
@@ -78,8 +126,8 @@ pipeline {
 
     post {
         always {
-            // Clean up workspace or temporary Docker objects if required
             cleanWs()
         }
     }
 }
+```
