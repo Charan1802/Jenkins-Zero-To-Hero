@@ -51,7 +51,7 @@ pipeline {
 
                         // Login using Secret Text and push image
                         withCredentials([string(credentialsId: 'Docker', variable: 'DOCKER_PAT')]) {
-                            sh 'echo "$DOCKER_PAT" | docker login -u Charan1412 --password-stdin'
+                            sh 'printf "%s" "$DOCKER_PAT" | docker login -u Charan1412 --password-stdin'
                             sh "docker push ${DOCKER_IMAGE}"
                         }
                     }
